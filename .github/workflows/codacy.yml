@@ -80,7 +80,6 @@ jobs:
         python -m pip install --upgrade pip-audit
         # Auditar el entorno instalado (incluye transitivas)
         pip-audit -f json -o pip-audit.json || true
-        pip-audit -f sarif -o pip-audit.sarif || true
 
         echo "## Análisis de seguridad (pip-audit) - Python ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
         if [ -s pip-audit.json ]; then
@@ -89,13 +88,12 @@ jobs:
           echo "pip-audit no generó resultados (archivo vacío o inexistente)." >> $GITHUB_STEP_SUMMARY
         fi
 
-    - name: Subir reporte pip-audit (JSON y SARIF)
+    - name: Subir reporte pip-audit)
       uses: actions/upload-artifact@v4
       with:
         name: pip-audit-${{ matrix.python-version }}
         path: |
           pip-audit.json
-          pip-audit.sarif
         if-no-files-found: ignore
         retention-days: 7
 
