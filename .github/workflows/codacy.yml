@@ -37,6 +37,55 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
+    - name: Check for outdated dependencies
+      run: |
+        # Obtener dependencias desactualizadas en JSON
+        pip list --outdated --format=json > outdated.json || true
+
+        # Escribir un resumen bonito en el Step Summary
+        echo "## Dependencias desactualizadas" >> $GITHUB_STEP_SUMMARY
+        if [ -s outdated.json ] && grep -q '"name"' outdated.json; then
+          echo "Se encontraron dependencias con nuevas versiones disponibles." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Paquete | Instalada | Última | Tipo |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---:|---:|---|" >> $GITHUB_STEP_SUMMARY
+          python -c 'import json; d=json.load(open("outdated.json")); [print(f"| {i[\"name\"]} | {i[\"version\"]} | {i[\"latest_version\"]} | {i.get(\"latest_filetype\",\"\")} |") for i in d]' >> $GITHUB_STEP_SUMMARY || true
+        else
+          echo "No se encontraron dependencias desactualizadas." >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Subir reporte de dependencias desactualizadas
+      uses: actions/upload-artifact@v4
+      with:
+        name: outdated-dependencies
+        path: outdated.json
+        if-no-files-found: ignore
+        retention-days: 7
+
+    - name: Upgrade outdated dependencies
+      run: |
+        set -e
+        if [ -s outdated.json ] && grep -q '"name"' outdated.json; then
+          pkgs=$(python -c 'import json; print(" ".join(p["name"] for p in json.load(open("outdated.json"))))' || true)
+          if [ -n "$pkgs" ]; then
+            echo "Actualizando paquetes: $pkgs"
+            pip install -U $pkgs
+            echo "## Paquetes actualizados" >> $GITHUB_STEP_SUMMARY
+            python -c 'import json; print("\n".join(f"- {p[\"name\"]}: {p[\"version\"]} -> {p[\"latest_version\"]}" for p in json.load(open("outdated.json"))))' >> $GITHUB_STEP_SUMMARY || true
+          fi
+        else
+          echo "No hay paquetes para actualizar."
+        fi
+        pip freeze > requirements-updated.txt || true
+
+    - name: Subir registro de actualizaciones
+      uses: actions/upload-artifact@v4
+      with:
+        name: requirements-updated
+        path: requirements-updated.txt
+        if-no-files-found: ignore
+        retention-days: 7
+
     - name: Upload coverage to Codacy
       run: |
         pip install codacy-coverage
